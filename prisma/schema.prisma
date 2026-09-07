@@ -1,0 +1,137 @@
+// Prisma Schema for HireFlow AI
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  clerkUserId String?  @unique
+  name        String
+  email       String   @unique
+  role        String   @default("HR_RECRUITER")
+  createdAt   DateTime @default(now())
+
+  jobs          Job[]
+  notifications Notification[]
+}
+
+model Job {
+  id                    String   @id @default(uuid())
+  title                 String
+  department            String
+  location              String   @default("Remote / Karachi")
+  employmentType        String   @default("Full-Time")
+  experienceRequired    String
+  minExperienceYears    Float    @default(2.0)
+  salaryRange           String?
+  description           String
+  requiredSkills        String   // JSON string of string[]
+  preferredSkills       String   // JSON string of string[]
+  educationRequirements String
+  responsibilities      String?
+  interviewCriteria     String?
+  status                String   @default("ACTIVE") // ACTIVE, CLOSED, DRAFT
+  createdBy             String?
+  createdAt             DateTime @default(now())
+
+  user             User?             @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  applications     Application[]
+  screeningResults ScreeningResult[]
+  interviews       Interview[]
+}
+
+model Candidate {
+  id                   String   @id @default(uuid())
+  name                 String
+  email                String
+  phone                String?
+  location             String?
+  linkedin             String?
+  github               String?
+  portfolio            String?
+  cvFileUrl            String?
+  cvFileName           String
+  parsedData           String   // Structured candidate JSON
+  rawText              String?
+  totalExperienceYears Float    @default(0.0)
+  status               String   @default("UPLOADED") 
+  // UPLOADED, PARSING, SCREENING, SCREENED, STRONG_MATCH, POTENTIAL_MATCH, WEAK_MATCH, REJECTED, INTERVIEW_RECOMMENDED, INTERVIEW_SCHEDULED, INTERVIEW_COMPLETED
+
+  createdAt            DateTime @default(now())
+
+  applications     Application[]
+  screeningResults ScreeningResult[]
+  interviews       Interview[]
+}
+
+model Application {
+  id          String   @id @default(uuid())
+  candidateId String
+  jobId       String
+  status      String   @default("APPLIED")
+  createdAt   DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, jobId])
+}
+
+model ScreeningResult {
+  id                   String   @id @default(uuid())
+  candidateId          String
+  jobId                String
+  overallScore         Int      // 0-100
+  skillsScore          Int      // Max 40
+  experienceScore      Int      // Max 25
+  educationScore       Int      // Max 10
+  projectScore         Int      // Max 15
+  qualificationScore   Int      // Max 10
+  recommendation       String   // STRONG_MATCH, POTENTIAL_MATCH, WEAK_MATCH, REJECT
+  strengths            String   // JSON array of strings
+  missingRequirements  String   // JSON array of strings
+  matchingSkills       String   // JSON array of strings
+  riskFlags            String   // JSON array of strings
+  summary              String
+  interviewRecommended Boolean  @default(false)
+  createdAt            DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model Interview {
+  id                String   @id @default(uuid())
+  candidateId       String
+  jobId             String
+  interviewer       String
+  date              String   // YYYY-MM-DD
+  startTime         String   // HH:MM AM/PM
+  duration          String   @default("45 mins")
+  type              String   @default("Video") // Video, Phone, In-person
+  meetingLink       String?
+  additionalMessage String?
+  status            String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  createdAt         DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?
+  type      String   // CANDIDATE_SCREENED, STRONG_MATCH, INTERVIEW_SCHEDULED, SYSTEM
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}

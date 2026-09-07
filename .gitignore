@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Build output
+dist/
+build/
+client/dist/
+
+# Database & Uploads
+prisma/*.db
+prisma/*.db-journal
+uploads/*
+!uploads/.gitkeep
+
+# Logs & OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
