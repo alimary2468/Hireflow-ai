@@ -56,10 +56,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve Frontend static production bundle if built (Unified Production Server)
+// Serve Frontend static production bundle if built
 const clientDistPath = path.join(__dirname, '../../client/dist');
 if (fs.existsSync(clientDistPath)) {
-  console.log(`[PRODUCTION SERVER] Serving static client build from: ${clientDistPath}`);
   app.use(express.static(clientDistPath));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
@@ -67,17 +66,10 @@ if (fs.existsSync(clientDistPath)) {
     }
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
-} else {
-  console.log('[DEVELOPMENT SERVER] Client dist not found. Run "npm run dev" or "npm run build" to generate client bundle.');
 }
 
-// Start Server & Check Initial DB State
-app.listen(PORT, async () => {
-  console.log(`\n======================================================`);
-  console.log(`🚀 HireFlow AI Backend Server active on port ${PORT}`);
-  console.log(`📡 Health Check URL: http://localhost:${PORT}/api/health`);
-  console.log(`======================================================\n`);
-
+// Ensure database auto-seed on startup if needed
+async function ensureDbInit() {
   try {
     const jobCount = await prisma.job.count();
     if (jobCount === 0) {
@@ -87,4 +79,18 @@ app.listen(PORT, async () => {
   } catch (err) {
     console.warn('Initial seed check note:', err);
   }
-});
+}
+
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, async () => {
+    console.log(`\n======================================================`);
+    console.log(`🚀 HireFlow AI Backend Server active on port ${PORT}`);
+    console.log(`📡 Health Check URL: http://localhost:${PORT}/api/health`);
+    console.log(`======================================================\n`);
+    await ensureDbInit();
+  });
+} else {
+  ensureDbInit().catch(console.warn);
+}
+
+export default app;
