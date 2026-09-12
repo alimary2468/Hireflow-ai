@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Briefcase, Plus, CheckCircle } from 'lucide-react';
+import { X, Briefcase, Plus, AlertCircle } from 'lucide-react';
 import { createJob } from '../services/api';
 
 interface CreateJobModalProps {
@@ -34,10 +34,12 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setErrorMessage(null);
 
     try {
       const reqArray = requiredSkills.split(',').map((s) => s.trim()).filter(Boolean);
@@ -49,7 +51,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
         location,
         employmentType,
         experienceRequired,
-        minExperienceYears: Number(minExperienceYears),
+        minExperienceYears: Number(minExperienceYears) || 2.0,
         salaryRange,
         requiredSkills: reqArray,
         preferredSkills: prefArray,
@@ -62,7 +64,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
       onSuccess();
       onClose();
     } catch (err: any) {
-      alert(`Job creation failed: ${err.message}`);
+      setErrorMessage(err?.response?.data?.error || err?.message || 'Job creation failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -87,6 +89,13 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+          {errorMessage && (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">Job Title *</label>
@@ -201,7 +210,7 @@ export const CreateJobModal: React.FC<CreateJobModalProps> = ({ isOpen, onClose,
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-600/30 transition flex items-center space-x-2"
+              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg shadow-blue-600/30 transition flex items-center space-x-2 disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
               <span>{isSubmitting ? 'Creating Position...' : 'Create Position'}</span>

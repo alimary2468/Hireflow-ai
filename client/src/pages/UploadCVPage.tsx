@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Sparkles, ArrowRight } from 'lucide-react';
-import { getJobs, uploadAndScreenCV } from '../services/api';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, Sparkles, ArrowRight, RefreshCw, Briefcase } from 'lucide-react';
+import { getJobs, uploadAndScreenCV, resetDemoData } from '../services/api';
 import { Job, Candidate, ScreeningResult } from '../types';
 
 export const UploadCVPage: React.FC = () => {
@@ -10,6 +10,8 @@ export const UploadCVPage: React.FC = () => {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>(searchParams.get('jobId') || '');
+  const [isLoadingJobs, setIsLoadingJobs] = useState<boolean>(true);
+  const [isSeedingDemo, setIsSeedingDemo] = useState<boolean>(false);
   const [file, setFile] = useState<File | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -32,14 +34,33 @@ export const UploadCVPage: React.FC = () => {
   }, []);
 
   const loadJobs = async () => {
+    setIsLoadingJobs(true);
     try {
       const data = await getJobs();
-      setJobs(data);
-      if (data.length > 0 && !selectedJobId) {
+      setJobs(data || []);
+      
+      const queryJobId = searchParams.get('jobId');
+      if (queryJobId && data.some(j => j.id === queryJobId)) {
+        setSelectedJobId(queryJobId);
+      } else if (data.length > 0) {
         setSelectedJobId(data[0].id);
       }
     } catch (e) {
       console.warn('Jobs load error:', e);
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  };
+
+  const handleSeedDemo = async () => {
+    setIsSeedingDemo(true);
+    try {
+      await resetDemoData();
+      await loadJobs();
+    } catch (err: any) {
+      setErrorMessage(err?.response?.data?.error || err.message || 'Failed to initialize demo data');
+    } finally {
+      setIsSeedingDemo(false);
     }
   };
 
@@ -61,8 +82,8 @@ export const UploadCVPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return setErrorMessage('Please select a CV file to upload');
-    if (!selectedJobId) return setErrorMessage('Please select a target job position');
+    if (!selectedJobId) return setErrorMessage('Please select a target job position to screen against');
+    if (!file) return setErrorMessage('Please select a CV file (PDF or DOCX) to upload');
 
     setIsProcessing(true);
     setErrorMessage(null);
@@ -111,7 +132,7 @@ export const UploadCVPage: React.FC = () => {
               {uploadResult.candidate.name} Evaluation Finished!
             </h3>
             <p className="text-xs text-slate-300 mt-1">
-              Position: <strong>{uploadResult.job?.title || 'Frontend Developer'}</strong>
+              Position: <strong>{uploadResult.job?.title || 'Target Job Position'}</strong>
             </p>
           </div>
 
@@ -147,23 +168,55 @@ export const UploadCVPage: React.FC = () => {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="p-8 rounded-3xl glass-card border border-slate-800 space-y-6">
+          {/* Job Selection Field */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-              Select Target Job Position *
-            </label>
-            <select
-              value={selectedJobId}
-              onChange={(e) => setSelectedJobId(e.target.value)}
-              className="w-full p-3.5 bg-slate-800/80 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
-            >
-              {jobs.map((job) => (
-                <option key={job.id} value={job.id}>
-                  {job.title} — {job.department} ({job.experienceRequired})
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                Select Target Job Position *
+              </label>
+              {isLoadingJobs && (
+                <span className="text-xs text-blue-400 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Loading active jobs...
+                </span>
+              )}
+            </div>
+
+            {jobs.length > 0 ? (
+              <select
+                value={selectedJobId}
+                onChange={(e) => setSelectedJobId(e.target.value)}
+                required
+                className="w-full p-3.5 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="" disabled className="bg-slate-900 text-slate-400">
+                  -- Choose Target Job Position --
                 </option>
-              ))}
-            </select>
+                {jobs.map((job) => (
+                  <option key={job.id} value={job.id} className="bg-slate-900 text-white font-medium py-2">
+                    {job.title} — {job.department} ({job.experienceRequired || 'Experience required'})
+                  </option>
+                ))}
+              </select>
+            ) : !isLoadingJobs ? (
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 shrink-0" />
+                  <span>No active job positions found to screen against.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSeedDemo}
+                  disabled={isSeedingDemo}
+                  className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 rounded-lg font-bold text-amber-200 flex items-center gap-1.5 transition"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSeedingDemo ? 'animate-spin' : ''}`} />
+                  <span>{isSeedingDemo ? 'Seeding...' : 'Load Demo Jobs'}</span>
+                </button>
+              </div>
+            ) : null}
           </div>
 
+          {/* CV Upload Dropzone */}
           <div>
             <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
               Candidate Resume / CV File *
@@ -253,7 +306,7 @@ export const UploadCVPage: React.FC = () => {
 
           <button
             type="submit"
-            disabled={isProcessing}
+            disabled={isProcessing || !selectedJobId}
             className="w-full py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-sm shadow-xl shadow-blue-600/30 transition disabled:opacity-50 flex items-center justify-center space-x-2"
           >
             {isProcessing ? (
