@@ -25,7 +25,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static uploaded files safely
-const uploadsPath = path.join(__dirname, '../uploads');
+const uploadsPath = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+}
 app.use('/uploads', express.static(uploadsPath));
 
 // API Routes
@@ -57,7 +60,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve Frontend static production bundle if built
-const clientDistPath = path.join(__dirname, '../../client/dist');
+const clientDistPath = path.join(process.cwd(), 'client', 'dist');
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));
   app.get('*', (req, res, next) => {
